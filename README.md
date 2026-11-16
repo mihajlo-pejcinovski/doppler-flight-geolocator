@@ -13,7 +13,7 @@ overhead, matched against ADS-B flight tracks. Full design: [SPEC.md](SPEC.md).
 | M4 Solver (gating, grid, refine, mirror, grading, observer height) | done |
 | M5 Validation | in progress: Manchester real end-to-end test at 211 m from the geotag, grade A (6 aircraft, joint solve over the full 75-min file); tracker finds 14 of 29 passes, 6 with right v/d; GPS-tagged set pending |
 | M6 GUI | done: `dopplergeo-gui` (install `.[gui]`): Run all, track editing and hand drawing, fit locks, video mutes, settings with keychain, cached re-analysis; end-to-end GUI tests pass |
-| M7 | not started |
+| M7 Polish (report/KML/PDF, settings parity, OpenSky Trino, packaging) | specified in SPEC.md, not started |
 
 ## Layout
 
@@ -25,7 +25,7 @@ dopplergeo/core/
   geo.py          WGS84 geodetic/ECEF/ENU, ENU velocity rotation
   solver.py       gating, grid search, joint refine (position, clock, height), mirror, grade
   elevation.py    observer height: constant, grid, Copernicus GLO-30 + EGM2008
-dopplergeo/locate.py  media -> families -> flights -> solution; outputs (shared with the future GUI)
+dopplergeo/locate.py  media -> families -> flights -> solution; outputs (shared by the CLI and the GUI)
 dopplergeo/flights/
   base.py         TrackPoint schema, BBox, query window, FlightProvider, FlightTrack (ECEF Hermite spline)
   cache.py        Parquet parts + DuckDB coverage index
@@ -48,6 +48,33 @@ python3 -m venv .venv
 .venv/bin/pytest
 .venv/bin/python examples/m1_demo.py
 ```
+
+## Start the GUI
+
+```
+python3 -m venv .venv
+.venv/bin/pip install -e '.[gui,dem]'
+.venv/bin/dopplergeo-gui                       # empty window
+.venv/bin/dopplergeo-gui flyover.mp4           # open a media file
+.venv/bin/dopplergeo-gui data/projects/manchester   # open a project folder
+```
+
+Options: `--cache DIR` (flight cache, default `~/.cache/dopplergeo/flights`) and
+`--no-basemap` (plain background instead of online OpenFreeMap tiles, e.g. offline).
+
+Work left to right through the step bar: **Load → Track → Fit → Flights → Locate**
+(or *Run all*). API keys (adsb.lol, OpenSky) go in *Settings* and are stored in the
+OS keychain; a variable already set in the shell wins.
+
+The map needs WebGL (QtWebEngine). On a machine without a usable GPU, start with
+`QTWEBENGINE_CHROMIUM_FLAGS=--enable-unsafe-swiftshader`; if QtWebEngine fails to
+start on Ubuntu 24.04 because of the sandbox, use `QTWEBENGINE_DISABLE_SANDBOX=1`.
+
+The audio is not in the repo (Freesound clips; their licences vary). The
+Manchester test clip is [Freesound 868926](https://freesound.org/s/868926/): save
+its HQ preview as `data/freesound/868926_5287430-hq.mp3`. The sample projects in
+`data/projects/` point to their media by absolute path, so on another machine open
+the clip itself instead (`dopplergeo-gui data/freesound/868926_5287430-hq.mp3`).
 
 ## Locate a video
 
