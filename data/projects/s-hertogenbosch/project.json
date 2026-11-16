@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "name": "'s-Hertogenbosch C-130 (Freesound 703104)",
+  "media": {
+    "path": "/home/miki/esp-projects/doppler-flight-geolocator/data/freesound/candidates/703104_1648170-hq.mp3",
+    "sha256": "8ece80000abe6c498c89d399191a0de3a9b6867f67a6b6d4a7595f1f31b50793",
+    "duration_s": 0.0,
+    "sample_rate": 0,
+    "start_utc": null,
+    "start_utc_source": "none",
+    "gps_tag": null
+  },
+  "start_utc_override": "2023-09-14T13:57:00Z",
+  "clock_bound_s": 600.0,
+  "region": {
+    "kind": "near",
+    "lat": 51.7,
+    "lon": 5.3,
+    "radius_km": 20.0,
+    "bbox": null
+  },
+  "spectro": {
+    "window_s": 1.0,
+    "hop_s": 0.1,
+    "zero_pad": 2,
+    "fmin": 20.0,
+    "fmax": 5000.0
+  },
+  "mutes": [],
+  "noise_range": null,
+  "providers": [
+    "adsblol-api",
+    "opensky",
+    "adsblol"
+  ],
+  "elevation": "auto",
+  "height_m": null,
+  "excluded_aircraft": [],
+  "fit_locks": {},
+  "reference_position": [
+    51.705521,
+    5.280979
+  ],
+  "reference_note": "Recordist's Freesound geotag (703104): Kerkhoekweg, De Rietvelden",
+  "fits": [],
+  "flight_query": null,
+  "candidates": [],
+  "solution": null
+}

@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.hypothesis/
+cache/
+*.egg-info/
+dist/
+build/
+
+# secrets (never commit)
+lolsdb_key.txt
+*.key
+.env
+
+# large / third-party-licensed audio (Freesound); see data/freesound/*.json for sources
+data/freesound/**/*.mp3
+data/freesound/**/*.wav

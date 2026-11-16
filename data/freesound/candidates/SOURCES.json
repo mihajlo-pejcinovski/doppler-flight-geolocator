@@ -1,0 +1,65 @@
+{
+ "note": "Freesound HQ previews (128 kbps); CC BY needs attribution to the recordist (user 1648170 for the NL clips).",
+ "clips": {
+  "843280_13282723-hq.mp3": {
+   "url": "https://freesound.org/s/843280/",
+   "license": "CC0",
+   "stated_time": "5 June 2024, around 7PM (EDT)",
+   "geotag": [
+    28.427178,
+    -81.303454
+   ],
+   "content": "jets taking off and landing at MCO, runway ~1 mile"
+  },
+  "703104_1648170-hq.mp3": {
+   "url": "https://freesound.org/s/703104/",
+   "license": "CC BY 4.0",
+   "stated_time": "Sept 14 2023, 3:57 PM (CEST)",
+   "geotag": [
+    51.705521,
+    5.280979
+   ],
+   "content": "F-16 and C-130H overhead"
+  },
+  "703239_1648170-hq.mp3": {
+   "url": "https://freesound.org/s/703239/",
+   "license": "CC BY 4.0",
+   "stated_time": "Sept 14 2023, 3:54 PM (CEST)",
+   "geotag": [
+    51.705521,
+    5.280979
+   ],
+   "content": "two C-130H"
+  },
+  "859373_1648170-hq.mp3": {
+   "url": "https://freesound.org/s/859373/",
+   "license": "CC BY 4.0",
+   "stated_time": "June 17 2026, 8:00 pm (CEST)",
+   "geotag": [
+    51.7388,
+    5.23135
+   ],
+   "content": "small prop plane overhead (GPS from description)"
+  },
+  "858688_1648170-hq.mp3": {
+   "url": "https://freesound.org/s/858688/",
+   "license": "CC BY 4.0",
+   "stated_time": "July 17, 2025, 11:40 am (CEST); filename says 250718",
+   "geotag": [
+    51.578671,
+    5.257332
+   ],
+   "content": "small prop plane"
+  },
+  "858591_1648170-hq.mp3": {
+   "url": "https://freesound.org/s/858591/",
+   "license": "CC BY 4.0",
+   "stated_time": "July 17, 2025, 12:43 pm (CEST); filename says 250718",
+   "geotag": [
+    51.578531,
+    5.255807
+   ],
+   "content": "prop plane with voice"
+  }
+ }
+}

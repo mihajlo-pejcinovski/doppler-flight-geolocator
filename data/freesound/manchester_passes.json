@@ -1,0 +1,238 @@
+{
+ "source": "Freesound 868926 (Haughton Green, 2026-09-03), media time 0 = 11:00:00 UTC (file clock); ADS-B adsb.lol 2026-09-03; observer = recordist geotag 53.44054,-2.099867 (not exact), h 150 m.",
+ "note": "Matched passes are heard ~7.6 s after t_cpa_media_s (clock offset and/or geotag error); match with a tolerance.",
+ "passes": [
+  {
+   "icao24": "4cac55",
+   "callsign": "RYR5ZC",
+   "t_cpa_media_s": 25.8,
+   "v_mps": 81.8,
+   "d_m": 771,
+   "t_cpa_utc": 1788433225.8
+  },
+  {
+   "icao24": "4d2288",
+   "callsign": "RYR60SF",
+   "t_cpa_media_s": 203.1,
+   "v_mps": 84.4,
+   "d_m": 777,
+   "t_cpa_utc": 1788433403.1
+  },
+  {
+   "icao24": "76cdac",
+   "callsign": "SIA301",
+   "t_cpa_media_s": 226.1,
+   "v_mps": 190.5,
+   "d_m": 2799,
+   "t_cpa_utc": 1788433426.1
+  },
+  {
+   "icao24": "4caead",
+   "callsign": "EAI66L",
+   "t_cpa_media_s": 487.3,
+   "v_mps": 78.9,
+   "d_m": 725,
+   "t_cpa_utc": 1788433687.3
+  },
+  {
+   "icao24": "40756f",
+   "callsign": "EZY32NC",
+   "t_cpa_media_s": 916.1,
+   "v_mps": 82.5,
+   "d_m": 761,
+   "t_cpa_utc": 1788434116.1
+  },
+  {
+   "icao24": "4d22b0",
+   "callsign": "RYR506G",
+   "t_cpa_media_s": 1170.6,
+   "v_mps": 79.0,
+   "d_m": 713,
+   "t_cpa_utc": 1788434370.6
+  },
+  {
+   "icao24": "4bb20f",
+   "callsign": "THY3LK",
+   "t_cpa_media_s": 1419.4,
+   "v_mps": 81.5,
+   "d_m": 779,
+   "t_cpa_utc": 1788434619.4
+  },
+  {
+   "icao24": "407cd8",
+   "callsign": "LOG694",
+   "t_cpa_media_s": 1666.8,
+   "v_mps": 76.1,
+   "d_m": 740,
+   "t_cpa_utc": 1788434866.8
+  },
+  {
+   "icao24": "4bcde4",
+   "callsign": "SXS5XL",
+   "t_cpa_media_s": 1889.7,
+   "v_mps": 80.2,
+   "d_m": 775,
+   "t_cpa_utc": 1788435089.7
+  },
+  {
+   "icao24": "4cae56",
+   "callsign": "RYR7239",
+   "t_cpa_media_s": 1936.9,
+   "v_mps": 161.6,
+   "d_m": 2879,
+   "t_cpa_utc": 1788435136.9
+  },
+  {
+   "icao24": "407cb3",
+   "callsign": "RUK7AY",
+   "t_cpa_media_s": 2036.2,
+   "v_mps": 86.6,
+   "d_m": 775,
+   "t_cpa_utc": 1788435236.2
+  },
+  {
+   "icao24": "407eeb",
+   "callsign": "EXS85RM",
+   "t_cpa_media_s": 2155.6,
+   "v_mps": 82.8,
+   "d_m": 779,
+   "t_cpa_utc": 1788435355.6
+  },
+  {
+   "icao24": "4080a2",
+   "callsign": "VIR811P",
+   "t_cpa_media_s": 2280.8,
+   "v_mps": 80.7,
+   "d_m": 776,
+   "t_cpa_utc": 1788435480.8
+  },
+  {
+   "icao24": "440065",
+   "callsign": "EJU38RC",
+   "t_cpa_media_s": 2456.9,
+   "v_mps": 80.7,
+   "d_m": 765,
+   "t_cpa_utc": 1788435656.9
+  },
+  {
+   "icao24": "494107",
+   "callsign": "NJE800N",
+   "t_cpa_media_s": 2627.5,
+   "v_mps": 79.1,
+   "d_m": 775,
+   "t_cpa_utc": 1788435827.5
+  },
+  {
+   "icao24": "4ca251",
+   "callsign": "RYR48BC",
+   "t_cpa_media_s": 2756.1,
+   "v_mps": 81.8,
+   "d_m": 758,
+   "t_cpa_utc": 1788435956.1
+  },
+  {
+   "icao24": "407ac1",
+   "callsign": "TOM40A",
+   "t_cpa_media_s": 2885.6,
+   "v_mps": 84.9,
+   "d_m": 766,
+   "t_cpa_utc": 1788436085.6
+  },
+  {
+   "icao24": "4083ad",
+   "callsign": "TOM5TC",
+   "t_cpa_media_s": 3023.8,
+   "v_mps": 83.4,
+   "d_m": 767,
+   "t_cpa_utc": 1788436223.8
+  },
+  {
+   "icao24": "34454b",
+   "callsign": "VLG1CA",
+   "t_cpa_media_s": 3215.4,
+   "v_mps": 80.0,
+   "d_m": 741,
+   "t_cpa_utc": 1788436415.4
+  },
+  {
+   "icao24": "407f0e",
+   "callsign": "RUK3186",
+   "t_cpa_media_s": 3331.2,
+   "v_mps": 84.7,
+   "d_m": 764,
+   "t_cpa_utc": 1788436531.2
+  },
+  {
+   "icao24": "4bcda9",
+   "callsign": "SXS5AR",
+   "t_cpa_media_s": 3457.8,
+   "v_mps": 82.7,
+   "d_m": 766,
+   "t_cpa_utc": 1788436657.8
+  },
+  {
+   "icao24": "40643d",
+   "callsign": "EZY72NL",
+   "t_cpa_media_s": 3578.2,
+   "v_mps": 87.7,
+   "d_m": 764,
+   "t_cpa_utc": 1788436778.2
+  },
+  {
+   "icao24": "406d8e",
+   "callsign": "EZY62LX",
+   "t_cpa_media_s": 3693.7,
+   "v_mps": 78.4,
+   "d_m": 761,
+   "t_cpa_utc": 1788436893.7
+  },
+  {
+   "icao24": "71002c",
+   "callsign": "SVA123",
+   "t_cpa_media_s": 3806.8,
+   "v_mps": 82.5,
+   "d_m": 771,
+   "t_cpa_utc": 1788437006.8
+  },
+  {
+   "icao24": "40624f",
+   "callsign": "SHT2D",
+   "t_cpa_media_s": 3976.9,
+   "v_mps": 81.1,
+   "d_m": 725,
+   "t_cpa_utc": 1788437176.9
+  },
+  {
+   "icao24": "405f12",
+   "callsign": "EZY92VH",
+   "t_cpa_media_s": 4103.3,
+   "v_mps": 92.0,
+   "d_m": 788,
+   "t_cpa_utc": 1788437303.3
+  },
+  {
+   "icao24": "4d2382",
+   "callsign": "RYR88FE",
+   "t_cpa_media_s": 4230.1,
+   "v_mps": 89.7,
+   "d_m": 776,
+   "t_cpa_utc": 1788437430.1
+  },
+  {
+   "icao24": "407f96",
+   "callsign": "TOM6BD",
+   "t_cpa_media_s": 4345.7,
+   "v_mps": 85.6,
+   "d_m": 775,
+   "t_cpa_utc": 1788437545.7
+  },
+  {
+   "icao24": "4070ee",
+   "callsign": "EXS41FZ",
+   "t_cpa_media_s": 4461.6,
+   "v_mps": 86.0,
+   "d_m": 778,
+   "t_cpa_utc": 1788437661.6
+  }
+ ]
+}

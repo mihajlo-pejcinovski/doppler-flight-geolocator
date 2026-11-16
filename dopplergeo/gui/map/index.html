@@ -1,0 +1,510 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dopplergeo map</title>
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<script src="vendor/maplibre-gl.js"></script>
+<script src="vendor/pmtiles.js"></script>
+<script src="vendor/qwebchannel.js"></script>
+<style>
+  html, body, #map { margin: 0; padding: 0; width: 100%; height: 100%; background: #e8e6e1; }
+  #tools { position: absolute; top: 8px; left: 8px; z-index: 2; display: flex; gap: 4px; }
+  #tools button { font: 12px system-ui, sans-serif; padding: 4px 8px; border: 1px solid #888;
+                  border-radius: 3px; background: #fff; cursor: pointer; }
+  #tools button.on { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
+  #box { position: absolute; border: 2px dashed #2b6cb0; background: rgba(43,108,176,0.1);
+         pointer-events: none; display: none; z-index: 3; }
+  #legend { position: absolute; bottom: 28px; right: 8px; z-index: 2; font: 12px system-ui, sans-serif;
+            background: rgba(255,255,255,0.92); padding: 6px 9px; border-radius: 4px; display: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.25); line-height: 1.55; }
+  #legend .row { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  #legend .sym { width: 16px; display: inline-flex; justify-content: center; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #999; }
+  .ring { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid #c53030; }
+  .area { width: 14px; height: 9px; background: rgba(197,48,48,0.15); border: 2px solid #c53030; border-radius: 50%; }
+  .line { width: 16px; height: 0; border-top: 3px solid; }
+  .dash { width: 16px; height: 0; border-top: 2px dashed #2b6cb0; }
+  .heat { width: 14px; height: 10px; background: linear-gradient(90deg, #fee391, #d95f0e); }
+  .mlabel { font: 11px system-ui, sans-serif; background: rgba(255,255,255,0.92); color: #222;
+            padding: 1px 5px; border-radius: 3px; border: 1px solid #d97706; white-space: nowrap;
+            pointer-events: none; }
+  .mlabel.total { font-weight: bold; background: #d97706; color: #fff; }
+  .mlabel.live { border-style: dashed; }
+  #status { position: absolute; bottom: 24px; left: 8px; z-index: 2; font: 11px system-ui, sans-serif;
+            background: rgba(255,255,255,0.85); padding: 2px 6px; border-radius: 3px; display: none; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="tools">
+  <button id="drawBtn" title="Drag a box to set the search region">Draw region</button>
+  <button id="fitBtn" title="Zoom to the data">Zoom to data</button>
+  <button id="heatBtn" class="on" title="Show the chi-square heatmap">Heatmap</button>
+  <button id="measureBtn" title="Measure a distance: click points; double-click or Enter finishes, Backspace removes the last point, Esc clears">Measure</button>
+</div>
+<div id="box"></div>
+<div id="status"></div>
+<div id="legend"></div>
+<script>
+"use strict";
+// Python <-> JS over QWebChannel. Python -> JS: bridge signals carrying JSON
+// strings. JS -> Python: bridge slots (regionDrawn, aircraftClicked,
+// pointClicked, measured, measureToggled, ready, jsError).
+const EMPTY = { type: "FeatureCollection", features: [] };
+const FALLBACK_STYLE = {
+  version: 8,
+  sources: {},
+  layers: [{ id: "bg", type: "background", paint: { "background-color": "#e8e6e1" } }],
+};
+let map = null, bridge = null, styleReady = false, pending = [];
+const data = { region: EMPTY, tracks: EMPTY, candidates: EMPTY, aircraft: EMPTY, heatmap: EMPTY,
+               solution: EMPTY, gps: EMPTY, measure: EMPTY, measureLive: EMPTY };
+
+function status(msg) {
+  const el = document.getElementById("status");
+  el.textContent = msg || ""; el.style.display = msg ? "block" : "none";
+}
+function report(e) { if (bridge) bridge.jsError(String(e && e.stack || e)); }
+window.addEventListener("error", (ev) => report(ev.error || ev.message));
+
+// Heading arrow drawn at runtime: works without any font glyphs (offline style).
+function arrowImage() {
+  const n = 32, c = document.createElement("canvas");
+  c.width = c.height = n;
+  const g = c.getContext("2d");
+  g.fillStyle = "#000";
+  g.beginPath(); g.moveTo(n / 2, 2); g.lineTo(n - 6, n - 4); g.lineTo(n / 2, n - 11); g.lineTo(6, n - 4);
+  g.closePath(); g.fill();
+  const im = g.getImageData(0, 0, n, n);
+  return { width: n, height: n, data: new Uint8Array(im.data.buffer) };
+}
+
+function addLayers() {
+  for (const [id, fc] of Object.entries(data)) {
+    if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: fc });
+  }
+  const L = (spec) => { if (!map.getLayer(spec.id)) map.addLayer(spec); };
+  L({ id: "heatmap", type: "heatmap", source: "heatmap",
+      paint: { "heatmap-weight": ["get", "w"], "heatmap-intensity": 1,
+               "heatmap-radius": ["interpolate", ["exponential", 2], ["zoom"], 8, 4, 16, 400],
+               "heatmap-opacity": 0.65,
+               "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
+                 0, "rgba(0,0,0,0)", 0.2, "#fee391", 0.5, "#fe9929", 0.8, "#d95f0e", 1, "#993404"] } });
+  L({ id: "region-fill", type: "fill", source: "region", paint: { "fill-color": "#2b6cb0", "fill-opacity": 0.05 } });
+  L({ id: "region-line", type: "line", source: "region",
+      paint: { "line-color": "#2b6cb0", "line-width": 1.5, "line-dasharray": [3, 2] } });
+  L({ id: "tracks", type: "line", source: "tracks",
+      paint: { "line-color": ["coalesce", ["get", "color"], "#777"], "line-width": 1.5, "line-opacity": 0.7 } });
+  L({ id: "tracks-hit", type: "line", source: "tracks", paint: { "line-width": 10, "line-opacity": 0 } });
+  L({ id: "candidates", type: "line", source: "candidates",
+      paint: { "line-color": ["get", "color"],
+               "line-width": ["case", ["boolean", ["get", "highlight"], false], 5,
+                              ["boolean", ["get", "used"], false], 3, 1.5],
+               "line-opacity": ["case", ["boolean", ["get", "included"], true], 0.95, 0.35] } });
+  L({ id: "candidates-hit", type: "line", source: "candidates", paint: { "line-width": 12, "line-opacity": 0 } });
+  if (!map.hasImage("arrow")) map.addImage("arrow", arrowImage(), { sdf: true });
+  L({ id: "aircraft", type: "symbol", source: "aircraft",
+      layout: { "icon-image": "arrow", "icon-size": 0.9, "icon-rotate": ["get", "heading"],
+                "icon-rotation-alignment": "map", "icon-allow-overlap": true, "icon-ignore-placement": true },
+      paint: { "icon-color": ["get", "color"], "icon-halo-color": "#fff", "icon-halo-width": 2 } });
+  L({ id: "ellipse-fill", type: "fill", source: "solution", filter: ["==", ["get", "kind"], "ellipse_95"],
+      paint: { "fill-color": "#c53030", "fill-opacity": 0.15 } });
+  L({ id: "ellipse-line", type: "line", source: "solution", filter: ["==", ["get", "kind"], "ellipse_95"],
+      paint: { "line-color": "#c53030", "line-width": 2 } });
+  L({ id: "mirror", type: "circle", source: "solution", filter: ["==", ["get", "kind"], "mirror"],
+      paint: { "circle-radius": 6, "circle-color": "#fff", "circle-stroke-color": "#c53030",
+               "circle-stroke-width": 2 } });
+  L({ id: "solution", type: "circle", source: "solution", filter: ["==", ["get", "kind"], "solution"],
+      paint: { "circle-radius": 6, "circle-color": "#c53030", "circle-stroke-color": "#fff",
+               "circle-stroke-width": 2 } });
+  L({ id: "gps", type: "circle", source: "gps",
+      paint: { "circle-radius": 5, "circle-color": "#2f855a", "circle-stroke-color": "#fff",
+               "circle-stroke-width": 2 } });
+  // Distance tool (our own sources/layers, so it works on any basemap and offline).
+  L({ id: "measure-live", type: "line", source: "measureLive",
+      paint: { "line-color": "#d97706", "line-width": 2, "line-dasharray": [2, 2] } });
+  L({ id: "measure-line", type: "line", source: "measure", filter: ["==", ["geometry-type"], "LineString"],
+      paint: { "line-color": "#d97706", "line-width": 3 } });
+  L({ id: "measure-points", type: "circle", source: "measure", filter: ["==", ["geometry-type"], "Point"],
+      paint: { "circle-radius": 4, "circle-color": "#fff", "circle-stroke-color": "#d97706",
+               "circle-stroke-width": 2 } });
+  styleReady = true;
+  const q = pending; pending = [];
+  q.forEach((f) => f());
+}
+
+function setData(id, fc) {
+  data[id] = fc || EMPTY;
+  const run = () => { const s = map.getSource(id); if (s) s.setData(data[id]); };
+  if (styleReady) run(); else pending.push(run);
+  updateLegend();
+}
+
+// Legend: only what is on the map right now.
+function updateLegend() {
+  const has = (id, kind) => (data[id].features || []).some((f) => !kind || f.properties?.kind === kind);
+  const rows = [];
+  const row = (sym, text) => rows.push(`<div class="row"><span class="sym">${sym}</span>${text}</div>`);
+  if (has("solution", "solution")) row('<span class="dot" style="background:#c53030"></span>',
+                                       "<b>Estimated recording position</b>");
+  if (has("solution", "ellipse_95")) row('<span class="area"></span>', "95% area of the estimate");
+  if (has("solution", "mirror")) row('<span class="ring"></span>', "Mirror position (alternative, fits worse)");
+  if (has("gps", "gps_tag")) row('<span class="dot" style="background:#2f855a"></span>', "File's GPS tag (true place)");
+  if (has("gps", "reference")) row('<span class="dot" style="background:#2f855a"></span>',
+                                   "<b>Known true position</b>");
+  if (has("candidates")) row('<span class="line" style="border-color:#4363d8"></span>',
+                             "Candidate aircraft (thick: used)");
+  if (has("tracks")) row('<span class="line" style="border-color:#3cb44b;opacity:.7"></span>',
+                         "Aircraft tracks (one colour each)");
+  if (has("heatmap") && document.getElementById("heatBtn").classList.contains("on"))
+    row('<span class="heat"></span>', "Fit quality (darker: better)");
+  if (has("region")) row('<span class="dash"></span>', "Search region");
+  const el = document.getElementById("legend");
+  el.innerHTML = rows.join("");
+  el.style.display = rows.length ? "block" : "none";
+}
+
+function boundsOf(fcs) {
+  const b = new maplibregl.LngLatBounds();
+  let n = 0;
+  const walk = (c) => {
+    if (typeof c[0] === "number") { b.extend(c); n++; } else c.forEach(walk);
+  };
+  for (const fc of fcs) for (const f of fc.features) if (f.geometry) walk(f.geometry.coordinates);
+  return n ? b : null;
+}
+function zoomToData() {
+  const b = boundsOf([data.solution, data.candidates, data.region, data.gps]) ||
+            boundsOf([data.tracks]);
+  if (b) map.fitBounds(b, { padding: 40, maxZoom: 15, duration: 0 });
+}
+
+function bboxPolygon(b) {  // [lat_min, lon_min, lat_max, lon_max]
+  if (!b) return EMPTY;
+  const [s, w, n, e] = b;
+  return { type: "FeatureCollection", features: [{ type: "Feature", properties: {},
+    geometry: { type: "Polygon", coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] } }] };
+}
+
+// --- region drawing ---------------------------------------------------------
+let drawing = false, start = null;
+function setDrawMode(on) {
+  if (on && meas.on) setMeasureMode(false);
+  drawing = on;
+  document.getElementById("drawBtn").classList.toggle("on", on);
+  map.getCanvas().style.cursor = idleCursor();
+  if (on) map.dragPan.disable(); else map.dragPan.enable();
+}
+function initDrawing() {
+  const box = document.getElementById("box");
+  map.on("mousedown", (e) => {
+    if (!drawing) return;
+    start = e.point;
+    Object.assign(box.style, { display: "block", left: start.x + "px", top: start.y + "px", width: "0", height: "0" });
+  });
+  map.on("mousemove", (e) => {
+    if (!drawing || !start) return;
+    const p = e.point;
+    Object.assign(box.style, { left: Math.min(p.x, start.x) + "px", top: Math.min(p.y, start.y) + "px",
+                               width: Math.abs(p.x - start.x) + "px", height: Math.abs(p.y - start.y) + "px" });
+  });
+  map.on("mouseup", (e) => {
+    if (!drawing || !start) return;
+    const a = map.unproject(start), b = map.unproject(e.point);
+    box.style.display = "none"; start = null; setDrawMode(false);
+    const bb = [Math.min(a.lat, b.lat), Math.min(a.lng, b.lng), Math.max(a.lat, b.lat), Math.max(a.lng, b.lng)];
+    if (bb[2] - bb[0] < 1e-4 || bb[3] - bb[1] < 1e-4) return;
+    setData("region", bboxPolygon(bb));
+    if (bridge) bridge.regionDrawn(JSON.stringify(bb));
+  });
+}
+
+// --- distance measuring -------------------------------------------------------
+// Geodesic method: haversine great circle on the WGS84 mean Earth radius
+// R1 = 6,371,008.8 m -- the same formula and radius as dopplergeo.core.geo.haversine_m,
+// so map readings and Python numbers agree exactly. Versus the ellipsoid (Vincenty /
+// Karney) this is within about 0.3 % (worst case ~0.5 %).
+const EARTH_R_M = 6371008.8;
+const rad = (d) => d * Math.PI / 180, deg = (r) => r * 180 / Math.PI;
+function geodesicM(lat1, lon1, lat2, lon2) {
+  const p1 = rad(lat1), p2 = rad(lat2), dp = p2 - p1, dl = rad(lon2 - lon1);
+  const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return 2 * EARTH_R_M * Math.asin(Math.sqrt(Math.min(1, Math.max(0, a))));
+}
+// Metric only: "842 m" below 1 km, "1.27 km" below 10 km, "12.4 km" above.
+// Mirrored by dopplergeo.gui.map.bridge.format_distance.
+function fmtDistance(m) {
+  if (!isFinite(m) || m < 0) return "";
+  if (Math.round(m) < 1000) return `${Math.round(m)} m`;
+  const km = m / 1000;
+  return Number(km.toFixed(2)) < 10 ? `${km.toFixed(2)} km` : `${km.toFixed(1)} km`;
+}
+// The point a fraction f of the way along the great circle a -> b ([lon, lat]).
+function gcPoint(a, b, f) {
+  const [l1, p1, l2, p2] = [rad(a[0]), rad(a[1]), rad(b[0]), rad(b[1])];
+  const D = geodesicM(a[1], a[0], b[1], b[0]) / EARTH_R_M;
+  if (D < 1e-12) return a;
+  const A = Math.sin((1 - f) * D) / Math.sin(D), B = Math.sin(f * D) / Math.sin(D);
+  const x = A * Math.cos(p1) * Math.cos(l1) + B * Math.cos(p2) * Math.cos(l2);
+  const y = A * Math.cos(p1) * Math.sin(l1) + B * Math.cos(p2) * Math.sin(l2);
+  const z = A * Math.sin(p1) + B * Math.sin(p2);
+  return [deg(Math.atan2(y, x)), deg(Math.atan2(z, Math.hypot(x, y)))];
+}
+// Points along the great circle a -> b, so the drawn line is the path that was
+// measured (a straight Mercator line is not, over long distances).
+function greatCircle(a, b, maxStepM = 20000) {
+  const n = Math.min(256, Math.ceil(geodesicM(a[1], a[0], b[1], b[0]) / maxStepM));
+  const out = [a];
+  for (let i = 1; i < n; i++) out.push(gcPoint(a, b, i / n));
+  out.push(b);
+  return out;
+}
+function pathLengthM(pts) {
+  let s = 0;
+  for (let i = 1; i < pts.length; i++) s += geodesicM(pts[i - 1][1], pts[i - 1][0], pts[i][1], pts[i][0]);
+  return s;
+}
+
+const meas = { on: false, pts: [], done: false, labels: [], live: null, cursor: null };
+function measLabel(lngLat, text, cls) {
+  const el = document.createElement("div");
+  el.className = "mlabel" + (cls ? " " + cls : "");
+  el.textContent = text;
+  return new maplibregl.Marker({ element: el, anchor: "bottom", offset: [0, -6] }).setLngLat(lngLat).addTo(map);
+}
+function setMeasureSource(id, fc) {
+  data[id] = fc;
+  const s = styleReady && map.getSource(id);
+  if (s) s.setData(fc);
+}
+function drawMeasure() {
+  meas.labels.forEach((m) => m.remove());
+  meas.labels = [];
+  const pts = meas.pts, feats = pts.map((p) => ({ type: "Feature", properties: {},
+                                                   geometry: { type: "Point", coordinates: p } }));
+  let total = 0;
+  if (pts.length > 1) {
+    const line = [];
+    for (let i = 1; i < pts.length; i++) {
+      const seg = greatCircle(pts[i - 1], pts[i]);
+      line.push(...(i > 1 ? seg.slice(1) : seg));
+      const d = geodesicM(pts[i - 1][1], pts[i - 1][0], pts[i][1], pts[i][0]);
+      total += d;
+      if (pts.length > 2) meas.labels.push(measLabel(gcPoint(pts[i - 1], pts[i], 0.5), fmtDistance(d)));
+    }
+    feats.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: line } });
+    const last = meas.labels.push(measLabel(pts[pts.length - 1], fmtDistance(total), "total"));
+    meas.labels[last - 1].getElement().id = "measureTotal";
+  }
+  setMeasureSource("measure", { type: "FeatureCollection", features: feats });
+  drawLive();
+}
+// Rubber band from the last point to the mouse, labelled with the would-be total.
+function drawLive() {
+  const c = meas.cursor;
+  if (!meas.on || meas.done || !meas.pts.length || !c) {
+    setMeasureSource("measureLive", EMPTY);
+    if (meas.live) { meas.live.remove(); meas.live = null; }
+    return;
+  }
+  const last = meas.pts[meas.pts.length - 1];
+  setMeasureSource("measureLive", { type: "FeatureCollection", features: [{ type: "Feature", properties: {},
+    geometry: { type: "LineString", coordinates: greatCircle(last, c) } }] });
+  const seg = geodesicM(last[1], last[0], c[1], c[0]), total = pathLengthM(meas.pts) + seg;
+  const text = meas.pts.length > 1 ? `+${fmtDistance(seg)} = ${fmtDistance(total)}` : fmtDistance(total);
+  if (!meas.live) { meas.live = measLabel(c, text, "live"); meas.live.getElement().id = "measureLive"; }
+  meas.live.setLngLat(c);
+  meas.live.getElement().textContent = text;
+}
+function measureAdd(lng, lat) {
+  if (meas.done) { meas.pts = []; meas.done = false; }   // a click after finishing starts anew
+  meas.pts.push([lng, lat]);
+  drawMeasure();
+}
+function measureFinish() {
+  if (meas.pts.length < 2) return;
+  meas.done = true;
+  drawMeasure();
+  if (bridge) bridge.measured(pathLengthM(meas.pts));
+}
+function measureUndo() {
+  if (!meas.pts.length) return;
+  meas.pts.pop(); meas.done = false;
+  drawMeasure();
+}
+function measureClear() {
+  meas.pts = []; meas.done = false; meas.cursor = null;
+  drawMeasure();
+}
+function setMeasureMode(on) {
+  on = !!on;
+  if (on && drawing) setDrawMode(false);
+  const changed = on !== meas.on;
+  meas.on = on;
+  document.getElementById("measureBtn").classList.toggle("on", on);
+  map.getCanvas().style.cursor = idleCursor();
+  if (on) map.doubleClickZoom.disable(); else { map.doubleClickZoom.enable(); measureClear(); }
+  if (changed && bridge) bridge.measureToggled(on);
+}
+function idleCursor() { return drawing || meas.on ? "crosshair" : ""; }
+function initMeasure() {
+  map.on("click", (e) => {
+    if (!meas.on) return;
+    // The two clicks of a double-click land on the last point: ignore the repeat.
+    const n = meas.pts.length;
+    if (n && !meas.done) {
+      const q = map.project(meas.pts[n - 1]);
+      if (Math.hypot(q.x - e.point.x, q.y - e.point.y) < 4) return;
+    }
+    measureAdd(e.lngLat.lng, e.lngLat.lat);
+  });
+  map.on("dblclick", (e) => { if (meas.on) { e.preventDefault(); measureFinish(); } });
+  map.on("mousemove", (e) => { if (meas.on) { meas.cursor = [e.lngLat.lng, e.lngLat.lat]; drawLive(); } });
+  map.getCanvas().addEventListener("mouseleave", () => { if (meas.on) { meas.cursor = null; drawLive(); } });
+  document.addEventListener("keydown", (ev) => {
+    if (!meas.on) return;
+    if (ev.key === "Enter") measureFinish();
+    else if (ev.key === "Backspace") measureUndo();
+    else if (ev.key === "Escape") { if (meas.pts.length) measureClear(); else setMeasureMode(false); }
+    else return;
+    ev.preventDefault();
+  });
+  document.getElementById("measureBtn").onclick = () => setMeasureMode(!meas.on);
+}
+
+function createMap(styleUrl) {
+  if (typeof pmtiles !== "undefined") {
+    const protocol = new pmtiles.Protocol();
+    maplibregl.addProtocol("pmtiles", protocol.tile);
+  }
+  map = new maplibregl.Map({
+    container: "map", style: styleUrl || FALLBACK_STYLE, center: [0, 20], zoom: 1.5,
+    attributionControl: false, preserveDrawingBuffer: true,  // PNG export via toDataURL
+  });
+  map.addControl(new maplibregl.AttributionControl({ compact: false,
+    customAttribution: "© OpenStreetMap contributors" }), "bottom-right");
+  map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
+  map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
+  // Our layers sit on top of whatever basemap style loads; re-add after a style swap.
+  map.on("style.load", () => { styleReady = false; addLayers(); });
+  let fellBack = !styleUrl;
+  map.on("error", (e) => {
+    const msg = e && e.error && e.error.message || "map error";
+    // Only a basemap failure (offline, bad style URL) switches to the plain
+    // background; data-layer errors are reported to Python.
+    const basemap = e && (e.sourceId === undefined || !(e.sourceId in data));
+    if (!fellBack && basemap && /style|fetch|Failed|NetworkError|AJAXError|load/i.test(msg)) {
+      fellBack = true;
+      status("Basemap unavailable (offline?): showing data only");
+      map.setStyle(FALLBACK_STYLE, { diff: false });  // full reload re-fires style.load
+    } else {
+      report("map: " + msg);
+    }
+  });
+  map.on("click", (e) => {
+    if (drawing || meas.on) return;   // the region / distance tools own clicks while active
+    const hits = map.queryRenderedFeatures(e.point, { layers: ["candidates-hit"] });
+    if (hits.length && bridge) { bridge.aircraftClicked(hits[0].properties.icao24); return; }
+    if (bridge) bridge.pointClicked(e.lngLat.lat, e.lngLat.lng);
+  });
+  // Hover a track or candidate: its callsign (the offline style has no font glyphs
+  // for map text, so a DOM popup instead).
+  const hoverPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
+  for (const layer of ["candidates-hit", "tracks-hit"]) {
+    map.on("mousemove", layer, (e) => {
+      const p = e.features[0].properties;
+      const name = (p.callsign || "").trim() || "(no callsign)";
+      hoverPopup.setLngLat(e.lngLat)
+        .setHTML(`<b style="color:${p.color}">${name}</b><br><small>${p.icao24}</small>`).addTo(map);
+    });
+    map.on("mouseleave", layer, () => hoverPopup.remove());
+  }
+  // Hover a point: what it is.
+  const pointPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10 });
+  const fmt = (c) => `${c[1].toFixed(5)}, ${c[0].toFixed(5)}`;
+  const describe = {
+    solution: (p, c) => `<b style="color:#c53030">Estimated recording position</b><br>${fmt(c)}` +
+      `<br>grade ${p.grade}${p.resolved === false ? " (mirror not ruled out)" : ""}` +
+      `<br>clock correction ${Number(p.dt_clock).toFixed(1)} s`,
+    mirror: (p, c) => `<b style="color:#c53030">Mirror position</b><br>${fmt(c)}` +
+      `<br>the reflection across the flight path; fits worse` +
+      (p.delta_chi2 !== undefined ? ` (Δχ² ${Number(p.delta_chi2).toFixed(0)})` : ""),
+    gps: (p, c) => p.kind === "reference"
+      ? `<b style="color:#2f855a">Known true position</b><br>${fmt(c)}<br>${p.note || "the recording's real location"}`
+      : `<b style="color:#2f855a">File's GPS tag</b><br>${fmt(c)}<br>where the file says it was recorded`,
+  };
+  for (const layer of ["solution", "mirror", "gps"]) {
+    map.on("mousemove", layer, (e) => {
+      const f = e.features[0];
+      pointPopup.setLngLat(f.geometry.coordinates).setHTML(describe[layer](f.properties, f.geometry.coordinates))
+        .addTo(map);
+      if (!meas.on && !drawing) map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", layer, () => { pointPopup.remove(); map.getCanvas().style.cursor = idleCursor(); });
+  }
+  map.on("mouseenter", "candidates-hit", () => { if (!drawing && !meas.on) map.getCanvas().style.cursor = "pointer"; });
+  map.on("mouseleave", "candidates-hit", () => { if (!drawing && !meas.on) map.getCanvas().style.cursor = ""; });
+  initDrawing();
+  initMeasure();
+  document.getElementById("drawBtn").onclick = () => setDrawMode(!drawing);
+  document.getElementById("fitBtn").onclick = zoomToData;
+  document.getElementById("heatBtn").onclick = (ev) => {
+    const on = !ev.target.classList.contains("on");
+    ev.target.classList.toggle("on", on);
+    if (map.getLayer("heatmap")) map.setLayoutProperty("heatmap", "visibility", on ? "visible" : "none");
+    updateLegend();
+  };
+}
+
+// Exposed for tests and for Python's runJavaScript.
+window.dg = {
+  ready: () => styleReady,
+  webgl: () => map !== null,
+  layerIds: () => map.getStyle().layers.map((l) => l.id),
+  count: (id) => (data[id] || EMPTY).features.length,
+  center: () => map.getCenter().toArray(),
+  jumpTo: (lat, lon, zoom) => { map.jumpTo({ center: [lon, lat], zoom }); return true; },
+  zoomToData, setDrawMode,
+  // distance tool
+  geodesicM, fmtDistance, setMeasureMode, measureFinish, measureUndo, measureClear,
+  measuring: () => meas.on,
+  measureTotal: () => pathLengthM(meas.pts),
+  measurePoints: () => meas.pts.length,
+  cursor: () => map.getCanvas().style.cursor,
+  labels: () => Array.from(document.querySelectorAll(".mlabel")).map((el) => el.textContent),
+  // A map click at (lat, lon), through the same handlers as a mouse click.
+  clickAt: (lat, lon) => map.fire("click", { point: map.project([lon, lat]),
+                                             lngLat: new maplibregl.LngLat(lon, lat), originalEvent: {} }),
+  hoverAt: (lat, lon) => map.fire("mousemove", { point: map.project([lon, lat]),
+                                                 lngLat: new maplibregl.LngLat(lon, lat), originalEvent: {} }),
+};
+
+new QWebChannel(qt.webChannelTransport, (channel) => {
+  bridge = channel.objects.bridge;
+  try {
+    createMap(bridge.styleUrl);
+  } catch (e) {
+    // No WebGL (old GPU, remote desktop, --disable-gpu): MapLibre cannot draw.
+    report(e);
+    status("Map unavailable: this system has no WebGL. Results are still in the tables and exports.");
+    document.getElementById("tools").style.display = "none";
+    bridge.ready();
+    return;
+  }
+  bridge.tracksChanged.connect((s) => setData("tracks", JSON.parse(s)));
+  bridge.candidatesChanged.connect((s) => setData("candidates", JSON.parse(s)));
+  bridge.heatmapChanged.connect((s) => setData("heatmap", JSON.parse(s)));
+  bridge.solutionChanged.connect((s) => setData("solution", JSON.parse(s)));
+  bridge.gpsChanged.connect((s) => setData("gps", JSON.parse(s)));
+  bridge.aircraftChanged.connect((s) => setData("aircraft", JSON.parse(s)));
+  bridge.regionChanged.connect((s) => setData("region", bboxPolygon(JSON.parse(s))));
+  bridge.zoomRequested.connect(() => { if (styleReady) zoomToData(); else pending.push(zoomToData); });
+  bridge.styleChanged.connect((url) => { status(""); map.setStyle(url || FALLBACK_STYLE, { diff: false }); });
+  bridge.measureRequested.connect((on) => setMeasureMode(on));
+  bridge.ready();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "name": "Manchester (Freesound 868926)",
+  "media": {
+    "path": "/home/miki/esp-projects/doppler-flight-geolocator/data/freesound/868926_5287430-hq.mp3",
+    "sha256": "eea4e0d074b15916d5be1c3dbda7b0fa2f9e8236b8cd01d1c89fc161ade66fe2",
+    "duration_s": 0.0,
+    "sample_rate": 0,
+    "start_utc": null,
+    "start_utc_source": "none",
+    "gps_tag": null
+  },
+  "start_utc_override": "2026-09-03T11:00:00Z",
+  "clock_bound_s": 600.0,
+  "region": {
+    "kind": "near",
+    "lat": 53.3537,
+    "lon": -2.275,
+    "radius_km": 25.0,
+    "bbox": null
+  },
+  "spectro": {
+    "window_s": 1.0,
+    "hop_s": 0.1,
+    "zero_pad": 2,
+    "fmin": 20.0,
+    "fmax": 5000.0
+  },
+  "mutes": [],
+  "noise_range": null,
+  "providers": [
+    "adsblol"
+  ],
+  "elevation": "auto",
+  "height_m": null,
+  "excluded_aircraft": [],
+  "reference_position": [
+    53.44054,
+    -2.099867
+  ],
+  "reference_note": "Recordist's Freesound geotag (868926), described as not exact",
+  "fits": [],
+  "flight_query": null,
+  "candidates": [],
+  "solution": null
+}
