@@ -56,7 +56,7 @@ python3 -m venv .venv
 .venv/bin/pip install -e '.[gui,dem]'
 .venv/bin/dopplergeo-gui                       # empty window
 .venv/bin/dopplergeo-gui flyover.mp4           # open a media file
-.venv/bin/dopplergeo-gui data/projects/manchester   # open a project folder
+.venv/bin/dopplergeo-gui path/to/project        # open a saved project folder
 ```
 
 Options: `--cache DIR` (flight cache, default `~/.cache/dopplergeo/flights`) and
@@ -72,9 +72,8 @@ start on Ubuntu 24.04 because of the sandbox, use `QTWEBENGINE_DISABLE_SANDBOX=1
 
 The audio is not in the repo (Freesound clips; their licences vary). The
 Manchester test clip is [Freesound 868926](https://freesound.org/s/868926/): save
-its HQ preview as `data/freesound/868926_5287430-hq.mp3`. The sample projects in
-`data/projects/` point to their media by absolute path, so on another machine open
-the clip itself instead (`dopplergeo-gui data/freesound/868926_5287430-hq.mp3`).
+its HQ preview as `data/freesound/868926_5287430-hq.mp3` and open it with
+`dopplergeo-gui data/freesound/868926_5287430-hq.mp3`.
 
 ## Locate a video
 

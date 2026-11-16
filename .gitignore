@@ -16,3 +16,6 @@ lolsdb_key.txt
 # large / third-party-licensed audio (Freesound); see data/freesound/*.json for sources
 data/freesound/**/*.mp3
 data/freesound/**/*.wav
+
+# local GUI projects (absolute media paths)
+data/projects/
